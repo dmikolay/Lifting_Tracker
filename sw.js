@@ -1,4 +1,4 @@
-const CACHE = "gym-v3";
+const CACHE = "gym-v11";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
 self.addEventListener("install", e => {
   self.skipWaiting();
