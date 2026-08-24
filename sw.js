@@ -1,5 +1,5 @@
-const CACHE = "gym-v14";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE = "gym-v15";
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-1024.png"];
 self.addEventListener("install", e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {}));
