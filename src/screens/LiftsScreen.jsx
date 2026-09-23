@@ -1,31 +1,37 @@
 import { useState } from "react";
 import { Card, Label, Stepper } from "../components/ui.jsx";
-import { DAY_KEYS, DAY_NAMES, EQUIPMENT_LABELS, LIFTS_BY_DAY, dayTitle } from "../data/program.js";
+import { DAYS, DAY_NAMES, EQUIPMENT_LABELS, daySlots } from "../data/program.js";
 import { shortDate } from "../lib/dates.js";
 import { sortLifts } from "../lib/volume.js";
 import { colors, fonts } from "../theme.js";
 
-// Every lift by program day, with its current target editable by hand.
+// Every lift by program day (both A/B variants), with its current target editable
+// by hand. A lift on several days is one record, so edits show on every day.
 export function LiftsScreen({ state, save }) {
   const [openId, setOpenId] = useState(null);
 
   return (
     <div style={{ padding: "18px 12px 12px" }}>
-      {DAY_KEYS.map((dayKey) => (
+      {DAYS.map(({ key: dayKey, title }) => (
         <div key={dayKey} style={{ marginBottom: 16 }}>
           <Label style={{ padding: "0 2px 8px" }}>
-            {DAY_NAMES[dayKey]} · {dayTitle(dayKey)}
+            {DAY_NAMES[dayKey]} · {title}
           </Label>
           <Card style={{ overflow: "hidden" }}>
-            {sortLifts(LIFTS_BY_DAY[dayKey]).map((lift) => {
+            {sortLifts(
+              daySlots(dayKey)
+                .flat()
+                .map(({ lift, sets, variant }) => ({ ...lift, sets, variant })),
+            ).map((lift) => {
               const progress = state.prog[lift.id];
-              const open = openId === lift.id;
+              const rowKey = `${dayKey}:${lift.id}`;
+              const open = openId === rowKey;
               const update = (field) => (value) =>
                 save({ ...state, prog: { ...state.prog, [lift.id]: { ...progress, [field]: value } } });
               return (
                 <div key={lift.id} style={{ borderBottom: `1px solid ${colors.line}` }}>
                   <div
-                    onClick={() => setOpenId(open ? null : lift.id)}
+                    onClick={() => setOpenId(open ? null : rowKey)}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
@@ -40,6 +46,7 @@ export function LiftsScreen({ state, save }) {
                         style={{ fontFamily: fonts.mono, fontSize: 10, color: colors.faint, marginTop: 3 }}
                       >
                         {EQUIPMENT_LABELS[lift.equipment]} · tier {lift.tier} · {lift.sets} sets
+                        {lift.variant && ` · week ${lift.variant}`}
                       </div>
                     </div>
                     <div style={{ fontFamily: fonts.mono, fontSize: 13, color: colors.grass }}>

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { LiftRow } from "../components/LiftRow.jsx";
 import { Card, Label, PrevNext } from "../components/ui.jsx";
 import { DAYS, DAY_NAMES } from "../data/program.js";
-import { parseDate, shiftDateStr, shortDate, weekdayKey } from "../lib/dates.js";
+import { parseDate, shiftDateStr, shortDate, weekStartOf, weekdayKey } from "../lib/dates.js";
+import { weekVariant, programForWeek } from "../lib/rotation.js";
 import { sessionForDate } from "../lib/schedule.js";
 import { totalSets } from "../lib/volume.js";
 import { clearLift, isLiftDone, keepSame, recordSet, resolvePrompt } from "../lib/workout.js";
@@ -11,8 +12,8 @@ import { colors, fonts } from "../theme.js";
 export function TodayScreen({ date, setDate, state, save, dayLog, setDayLog }) {
   const [openId, setOpenId] = useState(null);
   const { lifts, cut, shaved, title, sources, ordinal, nSessions } = useMemo(
-    () => sessionForDate(date, state.plans),
-    [date, state.plans],
+    () => sessionForDate(date, state.plans, programForWeek(weekStartOf(date), state.ab)),
+    [date, state.plans, state.ab],
   );
   const weekday = weekdayKey(parseDate(date));
   // Notes belong to the program day (the first one, if several are combined).
@@ -30,8 +31,8 @@ export function TodayScreen({ date, setDate, state, save, dayLog, setDayLog }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <Label>
-              {ordinal ? `Day ${ordinal} of ${nSessions}` : "Rest day"} · {DAY_NAMES[weekday]}{" "}
-              {shortDate(date)}
+              {ordinal ? `Day ${ordinal} of ${nSessions}` : "Rest day"} · Week{" "}
+              {weekVariant(weekStartOf(date), state.ab)} · {DAY_NAMES[weekday]} {shortDate(date)}
             </Label>
             <div
               style={{

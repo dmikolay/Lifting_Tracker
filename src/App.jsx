@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { today, monthKey } from "./lib/dates.js";
-import { STATE_KEY, loadState, logKey, readJSON, writeJSON } from "./lib/storage.js";
+import { STATE_KEY, loadMonthLog, loadState, logKey, writeJSON } from "./lib/storage.js";
 import { LiftsScreen } from "./screens/LiftsScreen.jsx";
 import { ProgressScreen } from "./screens/ProgressScreen.jsx";
 import { TodayScreen } from "./screens/TodayScreen.jsx";
@@ -24,7 +24,7 @@ export function App() {
 
   const month = monthKey(date);
   useEffect(() => {
-    if (!logs[month]) setLogs((prev) => ({ ...prev, [month]: readJSON(logKey(month)) || {} }));
+    if (!logs[month]) setLogs((prev) => ({ ...prev, [month]: loadMonthLog(month) }));
   }, [month, logs]);
 
   // Every change is written straight to localStorage.

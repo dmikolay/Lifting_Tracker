@@ -4,8 +4,8 @@ import { applyPrompt, evaluateSets } from "../src/lib/progression.js";
 import { STATE_KEY, createDefaultState, logKey, normalizeState } from "../src/lib/storage.js";
 import { clearLift, keepSame, recordSet, resolvePrompt } from "../src/lib/workout.js";
 
-const ohp = LIFTS_BY_ID["Tue|Overhead Press"]; // 3 sets, weight, 5–8 reps
-const dips = LIFTS_BY_ID["Sat|Dips"]; // amrap
+const ohp = { ...LIFTS_BY_ID["barbell-overhead-press"], sets: 3 }; // weight, 5–8 reps
+const dips = { ...LIFTS_BY_ID["dips"], sets: 3 }; // amrap
 const hit = (w, r) => ({ ok: true, w, r });
 const miss = (w, r) => ({ ok: false, w, r });
 
@@ -81,7 +81,7 @@ describe("logging a workout", () => {
     expect(state.pending[ohp.id]).toBeUndefined();
 
     ({ state, dayLog } = clearLift(state, dayLog, ohp, date));
-    expect(dayLog[ohp.id]).toBeUndefined();
+    expect(dayLog[ohp.id]).toEqual([]);
     expect(state.prog[ohp.id]).toEqual(createDefaultState().prog[ohp.id]);
   });
 

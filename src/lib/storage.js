@@ -8,9 +8,15 @@
 //
 // A SetResult is { ok: true|false, w, r } for a logged set, or
 // { keep: true, ok: null, w, r } for a set marked "Keep same".
+//
+// Program changes are carried forward by src/lib/migrate.js, additively: old
+// lift records and log entries are never removed or rewritten.
 
 import { LIFTS } from "../data/program.js";
-import { parseDate } from "./dates.js";
+import { parseDate, today, weekStartOf } from "./dates.js";
+import { defaultProgress, migrateMonthLog, migratePlans, migrateProgress } from "./migrate.js";
+
+export { defaultProgress };
 
 export const STATE_KEY = "gym:state:v1";
 export const logKey = (month) => `gym:log:${month}`;
@@ -35,54 +41,53 @@ export function writeJSON(key, value) {
   }
 }
 
-export function defaultProgress(lift) {
-  return {
-    w: lift.w,
-    r: lift.r,
-    lo: lift.lo,
-    hi: lift.hi,
-    strikes: 0, // consecutive fully missed sessions; two in a row reverts to `last`
-    last: lift.mode === "amrap" ? null : { w: lift.w, r: lift.r }, // last target fully hit
-    hist: [], // one { d, w, r, ok } per completed session, newest last
-  };
-}
-
-export function createDefaultState() {
+export function createDefaultState(weekStart = weekStartOf(today())) {
   return {
     v: 1,
-    prog: Object.fromEntries(LIFTS.map((l) => [l.id, defaultProgress(l)])), // per-lift targets
+    prog: Object.fromEntries(LIFTS.map((l) => [l.id, defaultProgress(l)])), // lift id -> progress
     notes: {}, // day key -> note text
     plans: {}, // week start (Sunday) -> { assign: { Mon: 1, ... }, split?: {...} }
     tests: [], // max tests: { d, vals: { [liftId]: string }, bw }
     pending: {}, // liftId -> progression prompt awaiting "Take it" / "Not yet"
     snap: {}, // "date|liftId" -> progress before that day's first set, restored by Clear
+    ab: { anchor: weekStart, flips: [] }, // A/B rotation, see lib/rotation.js
   };
 }
 
-// Fill in anything missing from older saves, and drop malformed week plans.
-export function normalizeState(saved) {
-  const state = { ...saved, prog: { ...saved.prog } };
-  for (const lift of LIFTS) {
-    if (!state.prog[lift.id]) state.prog[lift.id] = defaultProgress(lift);
-  }
-  state.pending = state.pending || {};
-  state.tests = state.tests || [];
-  state.snap = state.snap || {};
-  state.plans = Object.fromEntries(
-    Object.entries(state.plans || {}).filter(
-      ([weekStart, plan]) => plan && plan.assign && parseDate(weekStart).getDay() === 0,
+// Bring a saved state up to date: fill in anything missing, migrate lifts from
+// older programs, and drop malformed week plans. Safe to run repeatedly.
+export function normalizeState(saved, weekStart = weekStartOf(today())) {
+  const { prog, pending } = migrateProgress(saved.prog, saved.pending || {});
+  const plans = Object.fromEntries(
+    Object.entries(saved.plans || {}).filter(
+      ([start, plan]) => plan && plan.assign && parseDate(start).getDay() === 0,
     ),
   );
-  return state;
+  return {
+    ...saved,
+    prog,
+    pending,
+    tests: saved.tests || [],
+    snap: saved.snap || {},
+    plans: migratePlans(plans),
+    // The week this version first runs is week A of the rotation.
+    ab: saved.ab || { anchor: weekStart, flips: [] },
+  };
 }
 
-// Load saved state, creating (and saving) a fresh one on first run.
+// Load saved state, creating a fresh one on first run. Anything the migration
+// added is saved straight away so it's fixed from the first load (notably the
+// A/B anchor week).
 export function loadState() {
   const saved = readJSON(STATE_KEY);
-  if (saved && saved.prog) return { state: normalizeState(saved), warning: null };
-  const fresh = createDefaultState();
-  const warning = writeJSON(STATE_KEY, fresh)
-    ? null
-    : "This browser is blocking local storage. Turn off Private Browsing, or nothing will save.";
-  return { state: fresh, warning };
+  const state = saved && saved.prog ? normalizeState(saved) : createDefaultState();
+  const changed = JSON.stringify(state) !== JSON.stringify(saved);
+  const warning =
+    changed && !writeJSON(STATE_KEY, state)
+      ? "This browser is blocking local storage. Turn off Private Browsing, or nothing will save."
+      : null;
+  return { state, warning };
 }
+
+// A month's day logs, with current lift ids added next to legacy ones.
+export const loadMonthLog = (month) => migrateMonthLog(readJSON(logKey(month)) || {});

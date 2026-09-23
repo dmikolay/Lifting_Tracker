@@ -4,12 +4,13 @@ import {
   DAY_KEYS,
   DAY_NAMES,
   LIFTS,
-  LIFTS_BY_DAY,
   LIFTS_BY_ID,
+  LIFT_DAYS,
   MAX_TEST_LIFTS,
   unitLabel,
 } from "../data/program.js";
 import { daysBetween, monthKey, parseDate, shiftDateStr, shortDate } from "../lib/dates.js";
+import { LEGACY_IDS, liftForLoggedId, liftName } from "../lib/migrate.js";
 import { setsByMuscle } from "../lib/volume.js";
 import { colors, fonts } from "../theme.js";
 
@@ -20,6 +21,9 @@ const STALL_WEEKS = 4;
 const metric = (lift) => (lift.mode === "weight" ? "w" : "r");
 
 const loggedSetCount = (sets) => sets.filter((s) => s && s.ok !== null).length;
+
+// Chart picker groups: each lift listed once, under the first day it's on.
+const CHART_GROUPS = DAY_KEYS.map((key) => [key, LIFTS.filter((l) => LIFT_DAYS[l.id][0] === key)]);
 
 export function ProgressScreen({ state, save, logs, date }) {
   const [chartLiftId, setChartLiftId] = useState(MAX_TEST_LIFTS[0] ? MAX_TEST_LIFTS[0].id : LIFTS[0].id);
@@ -33,7 +37,7 @@ export function ProgressScreen({ state, save, logs, date }) {
       const ds = shiftDateStr(date, -back);
       const dayLog = (logs[monthKey(ds)] || {})[ds] || {};
       for (const [liftId, sets] of Object.entries(dayLog)) {
-        const lift = LIFTS_BY_ID[liftId];
+        const lift = liftForLoggedId(liftId);
         if (!lift) continue;
         const n = loggedSetCount(sets);
         if (n) entries.push({ lift, sets: n });
@@ -75,7 +79,9 @@ export function ProgressScreen({ state, save, logs, date }) {
       cells: Array.from({ length: daysInMonth }, (_, i) => {
         const ds = `${mk}-${String(i + 1).padStart(2, "0")}`;
         const dayLog = (logs[mk] || {})[ds] || {};
-        const n = Object.values(dayLog).reduce((sum, sets) => sum + loggedSetCount(sets), 0);
+        const n = Object.entries(dayLog)
+          .filter(([liftId]) => !LEGACY_IDS[liftId]) // counted under the current id
+          .reduce((sum, [, sets]) => sum + loggedSetCount(sets), 0);
         return { ds, n, num: i + 1 };
       }),
     };
@@ -128,9 +134,9 @@ export function ProgressScreen({ state, save, logs, date }) {
             fontFamily: fonts.sans,
           }}
         >
-          {DAY_KEYS.map((key) => (
+          {CHART_GROUPS.map(([key, lifts]) => (
             <optgroup key={key} label={DAY_NAMES[key]}>
-              {LIFTS_BY_DAY[key].map((lift) => (
+              {lifts.map((lift) => (
                 <option key={lift.id} value={lift.id}>
                   {lift.name}
                 </option>
@@ -150,7 +156,7 @@ export function ProgressScreen({ state, save, logs, date }) {
             <div key={lift.id} style={{ ...row, padding: "9px 14px", fontSize: 13 }}>
               <span style={{ color: colors.cream }}>
                 {lift.name}
-                <span style={{ color: colors.faint, fontSize: 11 }}> · {lift.day}</span>
+                <span style={{ color: colors.faint, fontSize: 11 }}> · {LIFT_DAYS[lift.id].join("/")}</span>
               </span>
               <span style={{ fontFamily: fonts.mono, color: colors.amber, fontSize: 12 }}>
                 {value} · {weeks}w
@@ -273,9 +279,7 @@ export function ProgressScreen({ state, save, logs, date }) {
                 .filter(([, v]) => v)
                 .map(([liftId, v]) => (
                   <div key={liftId} style={{ ...row, fontSize: 12, padding: "2px 0" }}>
-                    <span style={{ color: colors.cream }}>
-                      {LIFTS_BY_ID[liftId] ? LIFTS_BY_ID[liftId].name : liftId}
-                    </span>
+                    <span style={{ color: colors.cream }}>{liftName(liftId)}</span>
                     <span style={{ fontFamily: fonts.mono, color: colors.grass }}>{v}</span>
                   </div>
                 ))}

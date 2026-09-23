@@ -65,7 +65,7 @@ const minSets = (lift) => (lift.sets >= 4 || lift.tier === 1 ? 3 : 2);
  * Returns { lifts, cut, shaved }: the kept lifts (copies, with adjusted sets),
  * the dropped lifts, and [{ id, name, n, to }] for each shortened lift.
  */
-export function trimSession(sourceLifts, cap, weekShare) {
+export function trimSession(sourceLifts, cap, weekShare, targets = WEEKLY_SET_TARGETS) {
   let lifts = sourceLifts.map((l) => ({ ...l }));
   if (totalSets(lifts) <= cap) return { lifts, cut: [], shaved: [] };
 
@@ -77,9 +77,7 @@ export function trimSession(sourceLifts, cap, weekShare) {
   const byExpendability = (candidates, volume) => {
     const coverage = (lift) => {
       const muscles = primaryMuscles(lift);
-      return muscles.length
-        ? Math.min(...muscles.map((m) => volume[m] / (WEEKLY_SET_TARGETS[m] * weekShare)))
-        : 99;
+      return muscles.length ? Math.min(...muscles.map((m) => volume[m] / (targets[m] * weekShare))) : 99;
     };
     return [...candidates].sort(
       (a, b) =>

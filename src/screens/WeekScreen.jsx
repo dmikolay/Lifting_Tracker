@@ -7,7 +7,7 @@ import {
   primaryButton,
   secondaryButton,
 } from "../components/ui.jsx";
-import { DAYS, DAY_KEYS, DAY_NAMES, LIFTS_BY_DAY } from "../data/program.js";
+import { DAY_KEYS, DAY_NAMES } from "../data/program.js";
 import {
   addDays,
   parseDate,
@@ -30,6 +30,7 @@ import {
   splitSide,
   usedWeekdays,
 } from "../lib/schedule.js";
+import { programForWeek, toggleFlip, weekVariant } from "../lib/rotation.js";
 import { setsByMuscle, sortLifts, totalSets } from "../lib/volume.js";
 import { colors, fonts } from "../theme.js";
 
@@ -70,7 +71,11 @@ export function WeekScreen({ date, state, save }) {
     };
   };
 
-  const sessions = WEEKDAY_INDEXES.map((i) => buildSession(assign, splits, i));
+  const variant = weekVariant(weekStart, state.ab);
+  const program = programForWeek(weekStart, state.ab);
+  const flipWeek = () => save({ ...state, ab: toggleFlip(state.ab, weekStart) });
+
+  const sessions = WEEKDAY_INDEXES.map((i) => buildSession(program, assign, splits, i));
   const volume = setsByMuscle(sessions.flatMap((s) => s.lifts.map((lift) => ({ lift, sets: lift.sets }))));
   const weekSets = sessions.reduce((sum, s) => sum + totalSets(s.lifts), 0);
   const sessionCount = sessions.filter((s) => s.lifts.length).length;
@@ -150,7 +155,9 @@ export function WeekScreen({ date, state, save }) {
         }}
       >
         <div>
-          <Label>{isThisWeek ? "This week" : "Week"}</Label>
+          <Label>
+            {isThisWeek ? "This week" : "Week"} · Week {variant}
+          </Label>
           <div style={{ fontSize: 20, color: colors.cream, fontWeight: 600, marginTop: 4 }}>
             {shortDate(weekStart)} – {shortDate(shiftDateStr(weekStart, 6))}
           </div>
@@ -177,6 +184,9 @@ export function WeekScreen({ date, state, save }) {
       </div>
       <div
         style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           fontFamily: fonts.mono,
           fontSize: 11,
           color: colors.faint,
@@ -184,7 +194,24 @@ export function WeekScreen({ date, state, save }) {
           marginBottom: 14,
         }}
       >
-        {sessionCount} sessions · {weekSets} sets
+        <span>
+          {sessionCount} sessions · {weekSets} sets
+        </span>
+        <button
+          onClick={flipWeek}
+          style={{
+            padding: "3px 10px",
+            borderRadius: 5,
+            fontSize: 11,
+            fontFamily: fonts.sans,
+            cursor: "pointer",
+            border: `1px solid ${colors.line}`,
+            background: "transparent",
+            color: colors.dim,
+          }}
+        >
+          Make this week {variant === "A" ? "B" : "A"}
+        </button>
       </div>
 
       {editing && (
@@ -205,6 +232,7 @@ export function WeekScreen({ date, state, save }) {
               splits={splits}
               setSplits={setSplits}
               weekday={weekday}
+              program={program}
             />
           ))}
           <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -297,9 +325,9 @@ export function WeekScreen({ date, state, save }) {
 }
 
 // One program day in the plan editor: pick its weekday, or split it across two.
-function DayPlanRow({ dayKey, position, assign, setAssign, splits, setSplits, weekday }) {
+function DayPlanRow({ dayKey, position, assign, setAssign, splits, setSplits, weekday, program }) {
   const split = splits[dayKey];
-  const halfNames = splitHalfNames(dayKey);
+  const halfNames = splitHalfNames(program, dayKey);
 
   const weekdayPicker = (selectedIndex, onPick, accent) => (
     <div style={{ display: "flex", gap: 4 }}>
@@ -348,7 +376,7 @@ function DayPlanRow({ dayKey, position, assign, setAssign, splits, setSplits, we
     const neighbourDay = (key, side) =>
       key ? (splits[key] ? splits[key].to[side] : assign[key]) : assign[dayKey];
     const to = [neighbourDay(DAY_KEYS[position - 1], 1), neighbourDay(DAY_KEYS[position + 1], 0)];
-    next[dayKey] = { to, pick: defaultSplitPicks(dayKey, to, assign, splits) };
+    next[dayKey] = { to, pick: defaultSplitPicks(program, dayKey, to, assign, splits) };
     setAssign({ ...assign, [dayKey]: to[0] });
     setSplits(next);
   };
@@ -356,7 +384,7 @@ function DayPlanRow({ dayKey, position, assign, setAssign, splits, setSplits, we
   const header = (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
       <div style={{ fontSize: 13, color: colors.cream }}>
-        {position + 1}. {DAYS[position].title}
+        {position + 1}. {program.days[position].title}
       </div>
       <button
         onClick={toggleSplit}
@@ -385,7 +413,7 @@ function DayPlanRow({ dayKey, position, assign, setAssign, splits, setSplits, we
     );
   }
 
-  const lifts = sortLifts(LIFTS_BY_DAY[dayKey]);
+  const lifts = sortLifts(program.liftsByDay[dayKey]);
   const setsOnSide = (side) => totalSets(lifts.filter((l) => splitSide(split, l) === side));
   const moveHalf = (side, index) => {
     const to = [...split.to];

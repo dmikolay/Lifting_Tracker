@@ -46,8 +46,9 @@ export function recordSet(state, dayLog, lift, index, result, date) {
 
 // Wipe today's sets for a lift and restore its progress from before today.
 export function clearLift(state, dayLog, lift, date) {
-  const newDayLog = { ...dayLog };
-  delete newDayLog[lift.id];
+  // An empty list rather than a deleted key, so sets logged under a pre-migration
+  // lift id aren't copied back in on the next load (see migrateMonthLog).
+  const newDayLog = { ...dayLog, [lift.id]: [] };
 
   const prog = { ...state.prog };
   const pending = { ...state.pending };

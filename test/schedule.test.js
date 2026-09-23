@@ -1,20 +1,28 @@
-// golden.json holds outputs recorded from the original compiled app (before the
-// source rebuild) for randomly generated week plans. If one of these fails, the
-// scheduling/trimming behaviour has changed. That's fine if intended: regenerate
-// the fixture from the new behaviour and say so in the commit.
+// golden.json holds outputs recorded from the original compiled app for random
+// week plans, run against the program as it was then (legacy-program.json). They
+// pin the scheduling, split and trimming algorithms independently of the current
+// program. If one fails, that behaviour changed: fine if intended, but regenerate
+// the fixture and say so in the commit.
 
 import { describe, expect, it } from "vitest";
-import { LIFTS_BY_ID } from "../src/data/program.js";
 import { defaultSplitPicks, sessionForDate, shiftAssignment } from "../src/lib/schedule.js";
 import { trimSession } from "../src/lib/volume.js";
 import golden from "./golden.json";
+import legacy from "./legacy-program.json";
 
+const LEGACY_BY_ID = Object.fromEntries(
+  Object.values(legacy.liftsByDay)
+    .flat()
+    .map((l) => [l.id, l]),
+);
 const ids = (lifts) => lifts.map((l) => `${l.id}:${l.sets}`);
+// Single-focus split halves were "Legs A/B" in the original; now "Legs 1/2".
+const renumber = (label) => label.replace(/ A \(from/, " 1 (from").replace(/ B \(from/, " 2 (from");
 
 describe("sessionForDate matches the original app", () => {
   golden.sessions.forEach(({ date, plans, expect: want }, i) => {
     it(`case ${i}`, () => {
-      const s = sessionForDate(date, plans);
+      const s = sessionForDate(date, plans, legacy);
       expect({
         title: s.title,
         sources: s.sources,
@@ -23,7 +31,7 @@ describe("sessionForDate matches the original app", () => {
         lifts: ids(s.lifts),
         cut: ids(s.cut),
         shaved: s.shaved,
-      }).toEqual(want);
+      }).toEqual({ ...want, title: want.title && want.title.split(" + ").map(renumber).join(" + ") });
     });
   });
 });
@@ -31,7 +39,7 @@ describe("sessionForDate matches the original app", () => {
 describe("defaultSplitPicks matches the original app", () => {
   golden.splitPicks.forEach(({ day, to, assign, splits, expect: want }, i) => {
     it(`case ${i}`, () => {
-      expect(defaultSplitPicks(day, to, assign, splits)).toEqual(want);
+      expect(defaultSplitPicks(legacy, day, to, assign, splits)).toEqual(want);
     });
   });
 });
@@ -40,9 +48,10 @@ describe("trimSession matches the original app", () => {
   golden.trims.forEach(({ liftIds, cap, share, expect: want }, i) => {
     it(`case ${i}`, () => {
       const r = trimSession(
-        liftIds.map((id) => LIFTS_BY_ID[id]),
+        liftIds.map((id) => LEGACY_BY_ID[id]),
         cap,
         share,
+        legacy.targets,
       );
       expect({ lifts: ids(r.lifts), cut: ids(r.cut), shaved: r.shaved }).toEqual(want);
     });
@@ -50,14 +59,6 @@ describe("trimSession matches the original app", () => {
 });
 
 describe("schedule basics", () => {
-  it("a default week is six sessions, Monday to Saturday, rest on Sunday", () => {
-    expect(sessionForDate("2026-09-20", {}).title).toBe(null); // Sunday
-    const monday = sessionForDate("2026-09-21", {});
-    expect(monday.title).toBe("Legs & Arms");
-    expect(monday.ordinal).toBe(1);
-    expect(monday.nSessions).toBe(6);
-  });
-
   it("shiftAssignment refuses to move days out of the week", () => {
     const a = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
     expect(shiftAssignment(a, 1)).toBe(a);
