@@ -1,0 +1,3 @@
+dist/
+src/data/lifts.js
+test/golden.json
