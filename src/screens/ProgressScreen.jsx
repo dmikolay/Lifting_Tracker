@@ -101,15 +101,6 @@ export function ProgressScreen({ state, save, logs, date }) {
   const lastTest = state.tests.length ? state.tests[state.tests.length - 1] : null;
   const testDue = !lastTest || daysBetween(lastTest.d, date) >= MAX_TEST_INTERVAL_DAYS;
 
-  const downloadBackup = () => {
-    const json = JSON.stringify({ state, logs });
-    if (navigator.clipboard) navigator.clipboard.writeText(json);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-    a.download = `gym-backup-${date}.json`;
-    a.click();
-  };
-
   const section = { padding: "0 2px" };
   const row = { display: "flex", justifyContent: "space-between" };
 
@@ -290,23 +281,6 @@ export function ProgressScreen({ state, save, logs, date }) {
                 ))}
             </div>
           ))}
-      </Card>
-      <Card style={{ padding: 14, marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: colors.dim, marginBottom: 10, lineHeight: 1.5 }}>
-          Storage is tied to this published version. Back up before any rebuild.
-        </div>
-        <button
-          onClick={downloadBackup}
-          style={{
-            ...secondaryButton,
-            width: "100%",
-            padding: "10px 0",
-            border: `1px solid ${colors.grassDim}`,
-            color: colors.grass,
-          }}
-        >
-          Download backup
-        </button>
       </Card>
     </div>
   );
