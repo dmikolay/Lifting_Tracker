@@ -56,3 +56,9 @@ See `src/lib/rotation.js`, whose state lives in `state.ab`.
 - `test/fixtures/pre-migration-save.json` is an old-format save used by the migration tests.
 
 Put new logic in `src/lib/` with tests in `test/`, and keep screens thin.
+
+## Versioning
+
+Semantic versioning, below 1.0 while the app runs a single program: features bump the minor (0.3.0), fixes
+bump the patch (0.2.1). 1.0.0 is reserved for user-configurable programs. When releasing, update the version
+in `package.json` (`npm version <x.y.z> --no-git-tag-version`) and in `README.md`, then tag the commit `v<x.y.z>`.
